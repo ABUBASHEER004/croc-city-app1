@@ -37,8 +37,7 @@ class PaystackPaymentService {
     if (!kIsWeb && !PaystackConfig.isConfigured) {
       throw StateError(
         'Paystack public key is not configured. '
-        'Run the app with '
-        '--dart-define=PAYSTACK_PUBLIC_KEY=YOUR_PUBLIC_KEY.',
+        'Add PAYSTACK_PUBLIC_KEY=pk_test_... to the project .env file.',
       );
     }
 

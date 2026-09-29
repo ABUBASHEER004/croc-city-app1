@@ -1,3 +1,5 @@
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 /// Public Paystack configuration.
 ///
 /// The public key is safe to ship in the mobile application. The Paystack
@@ -6,12 +8,11 @@
 class PaystackConfig {
   const PaystackConfig._();
 
-  static const publicKey = String.fromEnvironment(
-    'PAYSTACK_PUBLIC_KEY',
-    defaultValue: 'pk_test_REPLACE_ME',
-  );
+  static String get publicKey =>
+      dotenv.env['PAYSTACK_PUBLIC_KEY']?.trim() ?? '';
 
   static bool get isConfigured =>
-      (publicKey.startsWith('pk_test_') || publicKey.startsWith('pk_live_')) &&
-      publicKey != 'pk_test_REPLACE_ME';
+      (publicKey.startsWith('pk_test_') ||
+          publicKey.startsWith('pk_live_')) &&
+      publicKey.length > 12;
 }

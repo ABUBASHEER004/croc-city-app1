@@ -651,14 +651,17 @@ pw.Widget _officialNote() {
   Future<pw.ImageProvider?> _networkImage(
     String url,
   ) async {
-    if (url.trim().isEmpty) {
-      return null;
-    }
+    final raw = url.trim();
+    if (raw.isEmpty) return null;
 
     try {
-      return await networkImage(
-        url.trim(),
-      );
+      String resolved = raw;
+      if (raw.startsWith('gs://')) {
+        resolved = await _storage.refFromURL(raw).getDownloadURL();
+      } else if (!raw.startsWith('http://') && !raw.startsWith('https://')) {
+        resolved = await _storage.ref(raw).getDownloadURL();
+      }
+      return await networkImage(resolved);
     } catch (_) {
       return null;
     }

@@ -92,7 +92,21 @@ class PlayerResultPdfService {
   pw.Widget _officialNote() => pw.Container(padding: const pw.EdgeInsets.all(11), decoration: pw.BoxDecoration(color: _navy, borderRadius: pw.BorderRadius.circular(8)), child: pw.Row(children: [pw.Text('✓', style: pw.TextStyle(color: _gold, fontSize: 16, fontWeight: pw.FontWeight.bold)), pw.SizedBox(width: 8), pw.Expanded(child: pw.Text('This document is an official digital player development record issued by Croc City Football Academy. Please retain it for your records.', style: const pw.TextStyle(color: PdfColors.white, fontSize: 8, lineSpacing: 1.3)))]));
   pw.Widget _footer(pw.Context context) => pw.Container(padding: const pw.EdgeInsets.only(top: 8), child: pw.Row(children: [pw.Text('Croc City Football Academy • Confidential player record', style: const pw.TextStyle(fontSize: 7, color: _muted)), pw.Spacer(), pw.Text('Page ${context.pageNumber} of ${context.pagesCount}', style: const pw.TextStyle(fontSize: 7, color: _muted))]));
   Future<pw.ImageProvider?> _assetImage(String path) async { try { return pw.MemoryImage((await rootBundle.load(path)).buffer.asUint8List()); } catch (_) { return null; } }
-  Future<pw.ImageProvider?> _networkImage(String url) async { if (url.trim().isEmpty) return null; try { return await networkImage(url.trim()); } catch (_) { return null; } }
+  Future<pw.ImageProvider?> _networkImage(String url) async {
+    final raw = url.trim();
+    if (raw.isEmpty) return null;
+    try {
+      String resolved = raw;
+      if (raw.startsWith('gs://')) {
+        resolved = await _storage.refFromURL(raw).getDownloadURL();
+      } else if (!raw.startsWith('http://') && !raw.startsWith('https://')) {
+        resolved = await _storage.ref(raw).getDownloadURL();
+      }
+      return await networkImage(resolved);
+    } catch (_) {
+      return null;
+    }
+  }
   String _initials(String name) { final parts = name.trim().split(RegExp(r'\s+')).where((x) => x.isNotEmpty).toList(); if (parts.isEmpty) return '?'; return parts.take(2).map((x) => x[0].toUpperCase()).join(); }
   Future<String> publishPdf({required String resultId, required String playerId, required Uint8List bytes}) async { final ref = _storage.ref('player_results/$playerId/$resultId.pdf'); await ref.putData(bytes, SettableMetadata(contentType: 'application/pdf')); return ref.getDownloadURL(); }
   Future<void> saveOrShare(Uint8List bytes, String filename) => Printing.sharePdf(bytes: bytes, filename: filename);

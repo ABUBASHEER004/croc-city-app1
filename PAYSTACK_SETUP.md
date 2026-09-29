@@ -24,19 +24,13 @@ flutter pub get
 
 ## 2. Configure the Paystack public key
 
-Do not put the Paystack secret key in Flutter.
+Do not put the Paystack secret key in Flutter. Create `.env` in the project root and add only the public key:
 
-Run the app with your Paystack **public key**:
-
-```bash
-flutter run --dart-define=PAYSTACK_PUBLIC_KEY=pk_test_xxxxxxxxxxxxxxxxx
+```text
+PAYSTACK_PUBLIC_KEY=pk_test_xxxxxxxxxxxxxxxxx
 ```
 
-For production, use your live public key:
-
-```bash
-flutter run --release --dart-define=PAYSTACK_PUBLIC_KEY=pk_live_xxxxxxxxxxxxxxxxx
-```
+The app loads this value with `flutter_dotenv`. Replace the test key with your live `pk_live_...` key for production. Never put an `sk_test_...` or `sk_live_...` key in `.env`.
 
 The public key is intentionally passed to Flutter. The secret key belongs only in Firebase Secret Manager.
 
@@ -98,7 +92,9 @@ The web build uses Paystack InlineJS v2 with the server-initialized `access_code
 Build the web app with:
 
 ```bash
-flutter build web --release --dart-define=PAYSTACK_PUBLIC_KEY=pk_live_YOUR_PUBLIC_KEY
+flutter build web --release
 ```
+
+The public key is loaded from `.env` at startup.
 
 The web resume flow itself does not expose the Secret Key; the Secret Key remains a Firebase Functions secret.

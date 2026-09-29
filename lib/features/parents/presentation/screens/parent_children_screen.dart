@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../models/app_user.dart';
 import '../../../players/data/models/player.dart';
-import '../../../players/data/player_result_pdf_service.dart';
 import '../../../players/data/player_result_service.dart';
 import '../../../players/data/services/player_firestore_service.dart';
 import '../../../students/data/models/student.dart';
-import '../../../students/data/student_result_pdf_service.dart';
 import '../../../students/data/student_service.dart';
 import '../../../dashboard/presentation/widgets/premium_ui.dart';
 
@@ -123,7 +122,7 @@ class _StudentChildCard extends StatelessWidget {
               return Column(children: results.map((result) => _ResultTile(
                 title: '${result['term'] ?? ''} · ${result['session'] ?? ''}',
                 subtitle: 'Official academic report',
-                onDownload: () => _downloadStudentResult(context, student, result),
+                onOpenPdf: () => _openStudentResult(context, student, result),
               )).toList());
             },
           ),
@@ -171,7 +170,7 @@ class _PlayerChildCard extends StatelessWidget {
               return Column(children: results.map((result) => _ResultTile(
                 title: '${result['term'] ?? ''} · ${result['session'] ?? ''}',
                 subtitle: 'Official player performance report',
-                onDownload: () => _downloadPlayerResult(context, player, result),
+                onOpenPdf: () => _openPlayerResult(context, player, result),
               )).toList());
             },
           ),
@@ -182,10 +181,10 @@ class _PlayerChildCard extends StatelessWidget {
 }
 
 class _ResultTile extends StatelessWidget {
-  const _ResultTile({required this.title, required this.subtitle, required this.onDownload});
+  const _ResultTile({required this.title, required this.subtitle, required this.onOpenPdf});
   final String title;
   final String subtitle;
-  final VoidCallback onDownload;
+  final VoidCallback onOpenPdf;
 
   @override
   Widget build(BuildContext context) => ListTile(
@@ -199,9 +198,9 @@ class _ResultTile extends StatelessWidget {
     title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
     subtitle: Text(subtitle),
     trailing: FilledButton.tonalIcon(
-      onPressed: onDownload,
+      onPressed: onOpenPdf,
       icon: const Icon(Icons.download_rounded, size: 18),
-      label: const Text('PDF'),
+      label: const Text('Download'),
     ),
   );
 }
@@ -226,47 +225,39 @@ class _ErrorView extends StatelessWidget {
   Widget build(BuildContext context) => Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(message, textAlign: TextAlign.center)));
 }
 
-Future<void> _downloadStudentResult(BuildContext context, Student student, Map<String, dynamic> result) async {
-  try {
-    final subjects = (result['subjects'] as List? ?? const [])
-        .map((item) => Map<String, dynamic>.from(item as Map))
-        .toList();
-    final bytes = await StudentResultPdfService().buildPdf(
-      studentName: student.fullName,
-      studentId: student.studentId,
-      className: student.className,
-      term: result['term']?.toString() ?? '',
-      session: result['session']?.toString() ?? '',
-      subjects: subjects,
-      photoUrl: student.photoUrl.isNotEmpty ? student.photoUrl : (result['photoUrl']?.toString() ?? ''),
-    );
-    final safeName = student.fullName.replaceAll(RegExp(r'[^a-zA-Z0-9]+'), '_');
-    await StudentResultPdfService().saveOrShare(bytes, '${safeName}_${result['session'] ?? 'result'}_${result['term'] ?? 'report'}.pdf');
-  } catch (error) {
-    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not prepare the PDF: $error')));
+Future<void> _openPublishedPdf(BuildContext context, String url) async {
+  final uri = Uri.tryParse(url.trim());
+  if (uri == null || !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to open the published PDF. Please try again.')),
+      );
+    }
   }
 }
 
-Future<void> _downloadPlayerResult(BuildContext context, Player player, Map<String, dynamic> result) async {
-  try {
-    final assessments = (result['assessments'] as List? ?? const [])
-        .map((item) => Map<String, dynamic>.from(item as Map))
-        .toList();
-    final bytes = await PlayerResultPdfService().buildPdf(
-      playerName: player.fullName,
-      playerId: player.id,
-      registrationNo: player.registrationNo,
-      teamName: result['teamName']?.toString() ?? '',
-      position: player.position,
-      term: result['term']?.toString() ?? '',
-      session: result['session']?.toString() ?? '',
-      assessments: assessments,
-      coachComment: result['coachComment']?.toString() ?? '',
-      photoUrl: player.photoUrl,
-    );
-    final safeName = player.fullName.replaceAll(RegExp(r'[^a-zA-Z0-9]+'), '_');
-    await PlayerResultPdfService().saveOrShare(bytes, '${safeName}_${result['session'] ?? 'result'}_${result['term'] ?? 'report'}.pdf');
-  } catch (error) {
-    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not prepare the PDF: $error')));
+Future<void> _openStudentResult(BuildContext context, Student student, Map<String, dynamic> result) async {
+  final publishedUrl = result['pdfUrl']?.toString().trim() ?? '';
+  if (publishedUrl.isEmpty) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('The official PDF has not been published yet.')),
+      );
+    }
+    return;
   }
+  await _openPublishedPdf(context, publishedUrl);
+}
+
+Future<void> _openPlayerResult(BuildContext context, Player player, Map<String, dynamic> result) async {
+  final publishedUrl = result['pdfUrl']?.toString().trim() ?? '';
+  if (publishedUrl.isEmpty) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('The official PDF has not been published yet.')),
+      );
+    }
+    return;
+  }
+  await _openPublishedPdf(context, publishedUrl);
 }

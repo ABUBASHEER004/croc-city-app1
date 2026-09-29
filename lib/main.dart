@@ -1,6 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'firebase_options.dart';
 import 'app/app.dart';
@@ -40,6 +41,13 @@ import 'features/communication/data/notification_service.dart';
 Future<void> main() async {
   // Make sure Flutter is initialized before Firebase.
   WidgetsFlutterBinding.ensureInitialized();
+
+  // ==========================================================
+  // ENVIRONMENT CONFIGURATION
+  // ==========================================================
+
+  // Loads the Paystack public key. Never place the Paystack secret key here.
+  await dotenv.load(fileName: '.env');
 
   // ==========================================================
   // FIREBASE INITIALIZATION

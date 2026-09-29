@@ -48,3 +48,8 @@ app.*.map.json
 service-account*.json
 firebase-service-account*.json
 *.service-account.json
+
+# Local environment secrets/configuration
+.env
+.env.*
+!.env.example

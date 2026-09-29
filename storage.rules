@@ -2,22 +2,52 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
+    function signedIn() { return request.auth != null; }
+    function isAdmin() {
+      return signedIn() && (
+        request.auth.token.admin == true ||
+        request.auth.token.role == 'admin' ||
+        request.auth.token.role == 'administrator' ||
+        get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['Admin', 'Administrator', 'admin', 'administrator']
+      );
+    }
+
     match /profile_photos/users/{userFile} {
-      allow read: if request.auth != null;
-      allow write, delete: if request.auth != null && (userFile == request.auth.uid + '.jpg' || userFile == request.auth.uid + '.jpeg' || userFile == request.auth.uid + '.png' || userFile == request.auth.uid + '.webp' || request.auth.token.admin == true);
+      allow read: if signedIn();
+      allow write, delete: if signedIn() && (
+        userFile == request.auth.uid + '.jpg' ||
+        userFile == request.auth.uid + '.jpeg' ||
+        userFile == request.auth.uid + '.png' ||
+        userFile == request.auth.uid + '.webp' ||
+        isAdmin()
+      );
     }
+
     match /profile_photos/players/{playerFile} {
-      allow read: if request.auth != null;
-      allow write, delete: if request.auth != null && request.auth.token.admin == true;
+      allow read: if signedIn();
+      allow write, delete: if isAdmin();
     }
+
     match /profile_photos/coaches/{coachFile} {
-      allow read: if request.auth != null;
-      allow write, delete: if request.auth != null && request.auth.token.admin == true;
+      allow read: if signedIn();
+      allow write, delete: if isAdmin();
     }
+
+    match /student_profiles/{studentId}/{fileName} {
+      allow read: if signedIn();
+      allow write, delete: if isAdmin();
+    }
+
     match /student_results/{studentId}/{resultId} {
-      allow read: if request.auth != null;
-      allow write, delete: if request.auth != null && request.auth.token.admin == true;
+      allow read: if signedIn();
+      allow write, delete: if isAdmin();
     }
+
+    match /player_results/{playerId}/{resultId} {
+      allow read: if signedIn();
+      allow write, delete: if isAdmin();
+    }
+
     match /{allPaths=**} { allow read, write: if false; }
   }
 }
