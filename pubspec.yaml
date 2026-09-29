@@ -62,6 +62,6 @@ flutter:
     - assets/images/
     - assets/icons/
     - assets/animations/
-    - .env
+    - assets/config/paystack.env
 
   

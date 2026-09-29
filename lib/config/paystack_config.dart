@@ -8,8 +8,11 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 class PaystackConfig {
   const PaystackConfig._();
 
-  static String get publicKey =>
-      dotenv.env['PAYSTACK_PUBLIC_KEY']?.trim() ?? '';
+  static String get publicKey {
+    final fromDotEnv = dotenv.env['PAYSTACK_PUBLIC_KEY']?.trim() ?? '';
+    if (fromDotEnv.isNotEmpty) return fromDotEnv;
+    return const String.fromEnvironment('PAYSTACK_PUBLIC_KEY').trim();
+  }
 
   static bool get isConfigured =>
       (publicKey.startsWith('pk_test_') ||

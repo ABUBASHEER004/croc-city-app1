@@ -47,7 +47,7 @@ Future<void> main() async {
   // ==========================================================
 
   // Loads the Paystack public key. Never place the Paystack secret key here.
-  await dotenv.load(fileName: '.env');
+  await dotenv.load(fileName: 'assets/config/paystack.env');
 
   // ==========================================================
   // FIREBASE INITIALIZATION

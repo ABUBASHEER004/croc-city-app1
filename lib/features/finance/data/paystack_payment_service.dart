@@ -37,7 +37,7 @@ class PaystackPaymentService {
     if (!kIsWeb && !PaystackConfig.isConfigured) {
       throw StateError(
         'Paystack public key is not configured. '
-        'Add PAYSTACK_PUBLIC_KEY=pk_test_... to the project .env file.',
+        'Set PAYSTACK_PUBLIC_KEY=pk_test_... in assets/config/paystack.env.',
       );
     }
 

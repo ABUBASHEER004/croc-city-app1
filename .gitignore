@@ -49,7 +49,7 @@ service-account*.json
 firebase-service-account*.json
 *.service-account.json
 
-# Local environment secrets/configuration
-.env
+# Local environment configuration. PAYSTACK_PUBLIC_KEY is a public key.
 .env.*
+!.env
 !.env.example

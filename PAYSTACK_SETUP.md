@@ -30,7 +30,7 @@ Do not put the Paystack secret key in Flutter. Create `.env` in the project root
 PAYSTACK_PUBLIC_KEY=pk_test_xxxxxxxxxxxxxxxxx
 ```
 
-The app loads this value with `flutter_dotenv`. Replace the test key with your live `pk_live_...` key for production. Never put an `sk_test_...` or `sk_live_...` key in `.env`.
+The app ships with a build-safe copy at `assets/config/paystack.env`, so Android/iOS builds do not fail when a hidden root `.env` file is omitted by a CI uploader. Keep the same public key in the root `.env` for local development if you use it. Replace the test key with your live `pk_live_...` key for production. Never put an `sk_test_...` or `sk_live_...` key in `.env`.
 
 The public key is intentionally passed to Flutter. The secret key belongs only in Firebase Secret Manager.
 
@@ -95,6 +95,6 @@ Build the web app with:
 flutter build web --release
 ```
 
-The public key is loaded from `.env` at startup.
+The public key is loaded from the bundled Paystack environment asset at startup.
 
 The web resume flow itself does not expose the Secret Key; the Secret Key remains a Firebase Functions secret.

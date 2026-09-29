@@ -32,7 +32,7 @@ class PlayerResultPdfService {
     final doc = pw.Document(author: 'Croc City Football Academy', title: 'Player Performance Report - $playerName');
     final average = assessments.isEmpty ? 0.0 : assessments.fold<double>(0, (sum, item) => sum + _number(item['score'])) / assessments.length;
     final logo = await _assetImage('assets/images/logo.jpg');
-    final portrait = await _networkImage(photoUrl);
+    final portrait = await _playerPhoto(playerId, photoUrl);
 
     doc.addPage(pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
@@ -88,24 +88,59 @@ class PlayerResultPdfService {
   pw.Widget _summaryCards(double average, int count) => pw.Row(children: [_stat('AVERAGE', '${average.toStringAsFixed(1)}%', _teal), pw.SizedBox(width: 8), _stat('AREAS', '$count', _navy), pw.SizedBox(width: 8), _stat('OVERALL GRADE', _grade(average), _gold)]);
   pw.Widget _stat(String label, String value, PdfColor accent) => pw.Expanded(child: pw.Container(padding: const pw.EdgeInsets.all(10), decoration: pw.BoxDecoration(color: PdfColors.white, borderRadius: pw.BorderRadius.circular(9), border: pw.Border.all(color: PdfColor.fromInt(0xFFE1E7EF))), child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [pw.Container(width: 22, height: 3, color: accent), pw.SizedBox(height: 7), pw.Text(label, style: const pw.TextStyle(fontSize: 6.5, color: _muted)), pw.SizedBox(height: 3), pw.Text(value, style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: _navy))])));
   pw.Widget _sectionTitle(String text) => pw.Row(children: [pw.Container(width: 4, height: 17, color: _gold), pw.SizedBox(width: 7), pw.Text(text, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: _navy, letterSpacing: .8))]);
-  pw.Widget _gradingNote() => pw.Container(padding: const pw.EdgeInsets.all(11), decoration: pw.BoxDecoration(color: PdfColor.fromInt(0xFFFFFBF2), borderRadius: pw.BorderRadius.circular(8), border: pw.Border.all(color: PdfColor.fromInt(0xFFF0DFB5))), child: pw.RichText(text: pw.TextSpan(children: [pw.TextSpan(text: 'Performance guide  ', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: _navy, fontSize: 8)), const pw.TextSpan(text: 'A = 70–100   B = 60–69   C = 50–59   D = 45–49   E = 40–44   F = below 40', style: pw.TextStyle(color: _muted, fontSize: 8))])));
+  pw.Widget _gradingNote() => pw.Container(padding: const pw.EdgeInsets.all(11), decoration: pw.BoxDecoration(color: PdfColor.fromInt(0xFFFFFBF2), borderRadius: pw.BorderRadius.circular(8), border: pw.Border.all(color: PdfColor.fromInt(0xFFF0DFB5))), child: pw.RichText(text: pw.TextSpan(children: [pw.TextSpan(text: 'Performance guide  ', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: _navy, fontSize: 8)), const pw.TextSpan(text: 'A = 70 - 100   B = 60 - 69   C = 50 - 59   D = 45 - 49   E = 40 - 44   F = below 40', style: pw.TextStyle(color: _muted, fontSize: 8))])));
   pw.Widget _officialNote() => pw.Container(padding: const pw.EdgeInsets.all(11), decoration: pw.BoxDecoration(color: _navy, borderRadius: pw.BorderRadius.circular(8)), child: pw.Row(children: [pw.Text('✓', style: pw.TextStyle(color: _gold, fontSize: 16, fontWeight: pw.FontWeight.bold)), pw.SizedBox(width: 8), pw.Expanded(child: pw.Text('This document is an official digital player development record issued by Croc City Football Academy. Please retain it for your records.', style: const pw.TextStyle(color: PdfColors.white, fontSize: 8, lineSpacing: 1.3)))]));
   pw.Widget _footer(pw.Context context) => pw.Container(padding: const pw.EdgeInsets.only(top: 8), child: pw.Row(children: [pw.Text('Croc City Football Academy • Confidential player record', style: const pw.TextStyle(fontSize: 7, color: _muted)), pw.Spacer(), pw.Text('Page ${context.pageNumber} of ${context.pagesCount}', style: const pw.TextStyle(fontSize: 7, color: _muted))]));
   Future<pw.ImageProvider?> _assetImage(String path) async { try { return pw.MemoryImage((await rootBundle.load(path)).buffer.asUint8List()); } catch (_) { return null; } }
   Future<pw.ImageProvider?> _networkImage(String url) async {
     final raw = url.trim();
     if (raw.isEmpty) return null;
+
+    // Prefer Firebase Storage bytes. This embeds the actual image in the PDF
+    // instead of relying on a remote image remaining reachable after export.
     try {
-      String resolved = raw;
-      if (raw.startsWith('gs://')) {
-        resolved = await _storage.refFromURL(raw).getDownloadURL();
-      } else if (!raw.startsWith('http://') && !raw.startsWith('https://')) {
-        resolved = await _storage.ref(raw).getDownloadURL();
+      final ref = raw.startsWith('gs://') ||
+              raw.startsWith('http://') ||
+              raw.startsWith('https://')
+          ? _storage.refFromURL(raw)
+          : _storage.ref(raw);
+      final bytes = await ref.getData(10 * 1024 * 1024);
+      if (bytes != null && bytes.isNotEmpty) {
+        return pw.MemoryImage(bytes);
       }
+    } catch (_) {
+      // Fall through to URL loading below.
+    }
+
+    try {
+      final resolved = raw.startsWith('gs://')
+          ? await _storage.refFromURL(raw).getDownloadURL()
+          : (!raw.startsWith('http://') && !raw.startsWith('https://'))
+              ? await _storage.ref(raw).getDownloadURL()
+              : raw;
       return await networkImage(resolved);
     } catch (_) {
       return null;
     }
+  }
+
+  Future<pw.ImageProvider?> _playerPhoto(String playerId, String photoUrl) async {
+    final direct = await _networkImage(photoUrl);
+    if (direct != null) return direct;
+
+    // Recover photos from the academy's standard player storage folder even
+    // if an older player record has an empty/stale photoUrl field.
+    try {
+      final folder = _storage.ref('profile_photos/players/$playerId');
+      final listing = await folder.listAll();
+      for (final item in listing.items) {
+        try {
+          final bytes = await item.getData(10 * 1024 * 1024);
+          if (bytes != null && bytes.isNotEmpty) return pw.MemoryImage(bytes);
+        } catch (_) {}
+      }
+    } catch (_) {}
+    return null;
   }
   String _initials(String name) { final parts = name.trim().split(RegExp(r'\s+')).where((x) => x.isNotEmpty).toList(); if (parts.isEmpty) return '?'; return parts.take(2).map((x) => x[0].toUpperCase()).join(); }
   Future<String> publishPdf({required String resultId, required String playerId, required Uint8List bytes}) async { final ref = _storage.ref('player_results/$playerId/$resultId.pdf'); await ref.putData(bytes, SettableMetadata(contentType: 'application/pdf')); return ref.getDownloadURL(); }

@@ -61,7 +61,7 @@ class StudentResultPdfService {
       'assets/images/logo.jpg',
     );
 
-    final portrait = await _networkImage(photoUrl);
+    final portrait = await _studentPhoto(studentId, photoUrl);
 
     doc.addPage(
       pw.MultiPage(
@@ -536,8 +536,8 @@ class StudentResultPdfService {
             ),
             const pw.TextSpan(
               text:
-                  'A = 70-100   B = 60-69   C = 50-59   '
-                  'D = 45-49   E = 40-44   F = below 40',
+                  'A = 70 - 100   B = 60 - 69   C = 50 - 59   '
+                  'D = 45 - 49   E = 40 - 44   F = below 40',
               style: pw.TextStyle(
                 color: _muted,
                 fontSize: 11,
@@ -655,16 +655,57 @@ pw.Widget _officialNote() {
     if (raw.isEmpty) return null;
 
     try {
-      String resolved = raw;
-      if (raw.startsWith('gs://')) {
-        resolved = await _storage.refFromURL(raw).getDownloadURL();
-      } else if (!raw.startsWith('http://') && !raw.startsWith('https://')) {
-        resolved = await _storage.ref(raw).getDownloadURL();
+      final ref = raw.startsWith('gs://') ||
+              raw.startsWith('http://') ||
+              raw.startsWith('https://')
+          ? _storage.refFromURL(raw)
+          : _storage.ref(raw);
+      final bytes = await ref.getData(10 * 1024 * 1024);
+      if (bytes != null && bytes.isNotEmpty) {
+        return pw.MemoryImage(bytes);
       }
+    } catch (_) {}
+
+    try {
+      final resolved = raw.startsWith('gs://')
+          ? await _storage.refFromURL(raw).getDownloadURL()
+          : (!raw.startsWith('http://') && !raw.startsWith('https://'))
+              ? await _storage.ref(raw).getDownloadURL()
+              : raw;
       return await networkImage(resolved);
     } catch (_) {
       return null;
     }
+  }
+
+  Future<pw.ImageProvider?> _studentPhoto(
+    String studentId,
+    String photoUrl,
+  ) async {
+    final direct = await _networkImage(photoUrl);
+    if (direct != null) return direct;
+
+    // Current student management uploads to this fixed path.
+    try {
+      final ref = _storage.ref('student_profiles/$studentId/profile.jpg');
+      final bytes = await ref.getData(10 * 1024 * 1024);
+      if (bytes != null && bytes.isNotEmpty) {
+        return pw.MemoryImage(bytes);
+      }
+    } catch (_) {}
+
+    // Also support the centralized profile-photo path used by newer records.
+    try {
+      final folder = _storage.ref('profile_photos/students/$studentId');
+      final listing = await folder.listAll();
+      for (final item in listing.items) {
+        try {
+          final bytes = await item.getData(10 * 1024 * 1024);
+          if (bytes != null && bytes.isNotEmpty) return pw.MemoryImage(bytes);
+        } catch (_) {}
+      }
+    } catch (_) {}
+    return null;
   }
 
   String _initials(
